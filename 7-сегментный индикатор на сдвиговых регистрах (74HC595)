@@ -1,9 +1,9 @@
-// ===== ПИНЫ УПРАВЛЕНИЯ СДВИГОВЫМ РЕГИСТРОМ =====
+//ПИНЫ УПРАВЛЕНИЯ СДВИГОВЫМ РЕГИСТРОМ
 #define LATCH_DIO 4   // RCLK - линия синхронизации (защёлка)
 #define CLK_DIO   7   // SRCLK - тактовый сигнал
 #define DATA_DIO  8   // SER - линия данных
 
-// ===== ТАБЛИЦА СЕГМЕНТОВ (для common-anode) =====
+//ТАБЛИЦА СЕГМЕНТОВ
 // 0 = сегмент горит, 1 = погашен (инверсная логика)
 // Формат: 0b<dp><g><f><e><d><c><b><a>
 const byte seg_digits[] = {
@@ -19,34 +19,34 @@ const byte seg_digits[] = {
   0x90   // 9: 10010000
 };
 
-// ===== ВЫБОР РАЗРЯДА =====
+//ВЫБОР РАЗРЯДА
 // Битовые маски для активации конкретного разряда
 // (зависит от схемы подключения второго регистра)
 const byte seg_num[] = {0xF1, 0xF2, 0xF4, 0xF8};  // разряды 0,1,2,3
 
-// ===== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ =====
+//ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
 volatile unsigned int counter = 0;        // счётчик 0..9999
 const unsigned int counter_max = 9999;    // предел счёта
 unsigned long counter_next = 0;           // время следующего шага
 const unsigned int counter_to = 200;      // интервал в мс (шаг счёта)
 
-// ===== НАСТРОЙКА =====
+//НАСТРОЙКА
 void setup() {
   pinMode(LATCH_DIO, OUTPUT);
   pinMode(CLK_DIO, OUTPUT);
   pinMode(DATA_DIO, OUTPUT);
   
-  // Начальное состояние линий
+  //Начальное состояние линий
   digitalWrite(LATCH_DIO, HIGH);
   digitalWrite(CLK_DIO, LOW);
   digitalWrite(DATA_DIO, LOW);
 }
 
-// ===== ОСНОВНОЙ ЦИКЛ =====
+//ОСНОВНОЙ ЦИКЛ
 void loop() {
   unsigned long tm = millis();
   
-  // Инкремент счётчика по таймеру (неблокирующая задержка)
+  // Инкремент счётчика по таймеру
   if (counter_next <= tm) {
     counter_next = tm + counter_to;
     counter++;
@@ -57,7 +57,7 @@ void loop() {
   displayNumber(counter);
 }
 
-// ===== ФУНКЦИЯ ВЫВОДА ЧИСЛА =====
+//ФУНКЦИЯ ВЫВОДА ЧИСЛА
 void displayNumber(unsigned int value) {
   // Извлекаем цифры: тысячи, сотни, десятки, единицы
   byte digits[4];
@@ -74,7 +74,7 @@ void displayNumber(unsigned int value) {
   }
 }
 
-// ===== ФУНКЦИЯ ЗАПИСИ ОДНОГО РАЗРЯДА В СДВИГОВЫЙ РЕГИСТР =====
+//ФУНКЦИЯ ЗАПИСИ ОДНОГО РАЗРЯДА В СДВИГОВЫЙ РЕГИСТР
 void writeDigit(byte position, byte digit) {
   // Начинаем передачу: опускаем LATCH
   digitalWrite(LATCH_DIO, LOW);
