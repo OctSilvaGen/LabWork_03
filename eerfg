@@ -1,0 +1,225 @@
+#include <MD_MAX72xx.h>
+#include <SPI.h>
+
+#define HARDWARE_TYPE MD_MAX72XX::FC16_HW
+#define MAX_DEVICES 4
+
+#define DATA_PIN 11
+#define CLK_PIN 13
+#define CS_PIN 10
+
+#define JOY_X A0
+#define JOY_Y A1
+#define JOY_SW 2
+
+MD_MAX72XX mx(HARDWARE_TYPE, DATA_PIN, CLK_PIN, CS_PIN, MAX_DEVICES);
+
+const int WIDTH = 32;
+const int SCREEN_H = 8;
+
+int playerX = 15;
+
+bool bulletActive = false;
+int bulletX = 0;
+int bulletY = 0;
+
+bool enemyActive = false;
+int enemyX = 0;
+int enemyY = 0;
+
+bool gameOver = false;
+int score = 0;
+
+unsigned long lastEnemyStep = 0;
+unsigned long lastBulletStep = 0;
+unsigned long lastInputStep = 0;
+unsigned long lastSpawnStep = 0;
+
+const unsigned long enemyDelay = 300;
+const unsigned long bulletDelay = 90;
+const unsigned long inputDelay = 70;
+const unsigned long spawnDelay = 700;
+
+void drawPixel(int x, int y, bool state)
+{
+  if (x >= 0 && x < WIDTH && y >= 0 && y < SCREEN_H)
+    mx.setPoint(y, x, state);
+}
+
+void clearDisplay()
+{
+  mx.clear();
+}
+
+void drawPlayer()
+{
+  drawPixel(playerX, 7, true);
+  drawPixel(playerX - 1, 6, true);
+  drawPixel(playerX, 6, true);
+  drawPixel(playerX + 1, 6, true);
+  drawPixel(playerX, 5, true);
+}
+
+void drawBullet()
+{
+  if (bulletActive)
+    drawPixel(bulletX, bulletY, true);
+}
+
+void drawEnemy()
+{
+  if (!enemyActive) return;
+
+  drawPixel(enemyX, enemyY, true);
+  drawPixel(enemyX - 1, enemyY + 1, true);
+  drawPixel(enemyX, enemyY + 1, true);
+  drawPixel(enemyX + 1, enemyY + 1, true);
+}
+
+void spawnEnemy()
+{
+  if (!enemyActive)
+  {
+    enemyActive = true;
+    enemyX = random(1, WIDTH - 2);
+    enemyY = 0;
+  }
+}
+
+void fireBullet()
+{
+  if (!bulletActive)
+  {
+    bulletActive = true;
+    bulletX = playerX;
+    bulletY = 4;
+  }
+}
+
+void readJoystick()
+{
+  if (millis() - lastInputStep < inputDelay) return;
+  lastInputStep = millis();
+
+  int xVal = analogRead(JOY_X);
+
+  if (xVal < 350 && playerX > 1)
+    playerX--;
+  else if (xVal > 650 && playerX < WIDTH - 2)
+    playerX++;
+
+  if (digitalRead(JOY_SW) == LOW)
+    fireBullet();
+}
+
+void updateBullet()
+{
+  if (!bulletActive) return;
+  if (millis() - lastBulletStep < bulletDelay) return;
+
+  lastBulletStep = millis();
+  bulletY--;
+
+  if (bulletY < 0)
+    bulletActive = false;
+}
+
+void updateEnemy()
+{
+  if (!enemyActive)
+  {
+    if (millis() - lastSpawnStep >= spawnDelay)
+    {
+      lastSpawnStep = millis();
+      spawnEnemy();
+    }
+    return;
+  }
+
+  if (millis() - lastEnemyStep < enemyDelay) return;
+
+  lastEnemyStep = millis();
+  enemyY++;
+
+  if (enemyY >= 6)
+    gameOver = true;
+}
+
+void checkHit()
+{
+  if (!bulletActive || !enemyActive) return;
+
+  bool hit = false;
+
+  if (bulletX == enemyX && bulletY == enemyY) hit = true;
+  if (bulletX == enemyX - 1 && bulletY == enemyY + 1) hit = true;
+  if (bulletX == enemyX && bulletY == enemyY + 1) hit = true;
+  if (bulletX == enemyX + 1 && bulletY == enemyY + 1) hit = true;
+
+  if (hit)
+  {
+    bulletActive = false;
+    enemyActive = false;
+    score++;
+  }
+}
+
+void showGameOver()
+{
+  mx.clear();
+
+  for (int i = 0; i < 8; i++)
+  {
+    drawPixel(12 + i, i, true);
+    drawPixel(12 + i, 7 - i, true);
+  }
+}
+
+void restartGame()
+{
+  playerX = 15;
+  bulletActive = false;
+  enemyActive = false;
+  gameOver = false;
+  score = 0;
+  mx.clear();
+  delay(300);
+}
+
+void renderGame()
+{
+  clearDisplay();
+  drawPlayer();
+  drawBullet();
+  drawEnemy();
+}
+
+void setup()
+{
+  mx.begin();
+  mx.control(MD_MAX72XX::INTENSITY, 3);
+  mx.clear();
+
+  pinMode(JOY_SW, INPUT_PULLUP);
+
+  randomSeed(analogRead(A5));
+}
+
+void loop()
+{
+  if (gameOver)
+  {
+    showGameOver();
+
+    if (digitalRead(JOY_SW) == LOW)
+      restartGame();
+
+    return;
+  }
+
+  readJoystick();
+  updateBullet();
+  updateEnemy();
+  checkHit();
+  renderGame();
+}
