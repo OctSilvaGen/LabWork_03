@@ -1,0 +1,48 @@
+#include <LedControl.h>
+
+// Пины: DIN, CLK, CS, количество модулей
+LedControl lc = LedControl(11, 13, 10, 4);
+
+// Для ВЕРТИКАЛЬНОГО расположения:
+// Матрица 0 - верхняя
+// Матрица 1 - вторая сверху
+// Матрица 2 - третья сверху  
+// Матрица 3 - нижняя
+
+const char* message = "HELLO ";
+int scrollPos = 0;
+unsigned long lastScroll = 0;
+int scrollDelay = 150;
+
+void setup() {
+  for (int i = 0; i < 4; i++) {
+    lc.shutdown(i, false);
+    lc.setIntensity(i, 8);
+    lc.clearDisplay(i);
+  }
+}
+
+void loop() {
+  if (millis() - lastScroll >= scrollDelay) {
+    lastScroll = millis();
+    scrollPos++;
+    if (scrollPos > 100) scrollPos = 0;
+    displayScroll();
+  }
+}
+
+// Простая бегущая строка по вертикали
+void displayScroll() {
+  for (int module = 0; module < 4; module++) {
+    // Для каждой матрицы показываем разные строки
+    // Здесь простой пример - сдвиг по столбцам
+    for (int row = 0; row < 8; row++) {
+      byte data = 0;
+      // Пример: диагональная линия
+      if ((row + scrollPos) % 8 == 0) {
+        data = B10000000 >> (scrollPos % 8);
+      }
+      lc.setRow(module, row, data);
+    }
+  }
+}
