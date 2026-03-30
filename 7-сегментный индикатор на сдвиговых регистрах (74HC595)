@@ -1,0 +1,93 @@
+// ===== ПИНЫ УПРАВЛЕНИЯ СДВИГОВЫМ РЕГИСТРОМ =====
+#define LATCH_DIO 4   // RCLK - линия синхронизации (защёлка)
+#define CLK_DIO   7   // SRCLK - тактовый сигнал
+#define DATA_DIO  8   // SER - линия данных
+
+// ===== ТАБЛИЦА СЕГМЕНТОВ (для common-anode) =====
+// 0 = сегмент горит, 1 = погашен (инверсная логика)
+// Формат: 0b<dp><g><f><e><d><c><b><a>
+const byte seg_digits[] = {
+  0xC0,  // 0: 11000000
+  0xF9,  // 1: 11111001
+  0xA4,  // 2: 10100100
+  0xB0,  // 3: 10110000
+  0x99,  // 4: 10011001
+  0x92,  // 5: 10010010
+  0x82,  // 6: 10000010
+  0xF8,  // 7: 11111000
+  0x80,  // 8: 10000000
+  0x90   // 9: 10010000
+};
+
+// ===== ВЫБОР РАЗРЯДА =====
+// Битовые маски для активации конкретного разряда
+// (зависит от схемы подключения второго регистра)
+const byte seg_num[] = {0xF1, 0xF2, 0xF4, 0xF8};  // разряды 0,1,2,3
+
+// ===== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ =====
+volatile unsigned int counter = 0;        // счётчик 0..9999
+const unsigned int counter_max = 9999;    // предел счёта
+unsigned long counter_next = 0;           // время следующего шага
+const unsigned int counter_to = 200;      // интервал в мс (шаг счёта)
+
+// ===== НАСТРОЙКА =====
+void setup() {
+  pinMode(LATCH_DIO, OUTPUT);
+  pinMode(CLK_DIO, OUTPUT);
+  pinMode(DATA_DIO, OUTPUT);
+  
+  // Начальное состояние линий
+  digitalWrite(LATCH_DIO, HIGH);
+  digitalWrite(CLK_DIO, LOW);
+  digitalWrite(DATA_DIO, LOW);
+}
+
+// ===== ОСНОВНОЙ ЦИКЛ =====
+void loop() {
+  unsigned long tm = millis();
+  
+  // Инкремент счётчика по таймеру (неблокирующая задержка)
+  if (counter_next <= tm) {
+    counter_next = tm + counter_to;
+    counter++;
+    if (counter > counter_max) counter = 0;
+  }
+  
+  // Отображение числа на 4-разрядном индикаторе
+  displayNumber(counter);
+}
+
+// ===== ФУНКЦИЯ ВЫВОДА ЧИСЛА =====
+void displayNumber(unsigned int value) {
+  // Извлекаем цифры: тысячи, сотни, десятки, единицы
+  byte digits[4];
+  unsigned int temp = value;
+  for (int i = 3; i >= 0; i--) {
+    digits[i] = temp % 10;
+    temp /= 10;
+  }
+  
+  // Последовательно выводим каждый разряд
+  for (byte pos = 0; pos < 4; pos++) {
+    writeDigit(pos, digits[pos]);
+    delay(2);  // Краткая задержка для стабильности (опционально)
+  }
+}
+
+// ===== ФУНКЦИЯ ЗАПИСИ ОДНОГО РАЗРЯДА В СДВИГОВЫЙ РЕГИСТР =====
+void writeDigit(byte position, byte digit) {
+  // Начинаем передачу: опускаем LATCH
+  digitalWrite(LATCH_DIO, LOW);
+  
+  // 1. Отправляем код сегментов (цифра)
+  shiftOut(DATA_DIO, CLK_DIO, MSBFIRST, seg_digits[digit]);
+  
+  // 2. Отправляем код выбора разряда
+  shiftOut(DATA_DIO, CLK_DIO, MSBFIRST, seg_num[position]);
+  
+  // Завершаем передачу: поднимаем LATCH → данные фиксируются
+  digitalWrite(LATCH_DIO, HIGH);
+  
+  // Короткая пауза для стабильности (можно убрать)
+  delayMicroseconds(100);
+}
