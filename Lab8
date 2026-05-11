@@ -1,0 +1,13 @@
+void setup() {
+  Serial.begin(9600); 
+}
+
+void loop() {
+  // Используем analogRead для получения плавных значений
+  int lightValue = analogRead(A0); 
+  
+  Serial.print("Light Level (0-1023): ");
+  Serial.println(lightValue);       
+  
+  delay(500);                      
+}
